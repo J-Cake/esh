@@ -4,6 +4,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Index, Sub};
 
 use lazy_static;
+
 use crate::command::parser::matchers::Matcher;
 
 #[derive(Copy, Clone, Debug)]
@@ -106,21 +107,24 @@ pub fn tokenise(input: &str) -> Result<Vec<Token>, String> {
     let matcher = Matcher::new();
 
     let mut index: usize = 0;
-    let mut line: usize = 1;
 
     while index < input.len() {
         if let Some((lexeme, r#type)) = matcher.match_all(&input[index..]) {
-            tokens.push(Token {
-                token_type: r#type,
-                lexeme: lexeme.to_owned(),
-                column: 0,
-                line: 0,
-                index,
-            });
+            match r#type {
+                TokenType::Whitespace(_) => {}
+                TokenType::Comment(_) => {}
+                _ => tokens.push(Token {
+                    token_type: r#type,
+                    lexeme: lexeme.to_owned(),
+                    column: input[..=index].split('\n').last().unwrap().len(),
+                    line: input[..=index].split('\n').count(),
+                    index,
+                })
+            };
 
             index += lexeme.len();
         } else {
-            return Err(format!("SyntaxError: Unexpected token '{}'", input[..index].split('\n').last().unwrap().split_whitespace().last().unwrap()));
+            return Err(format!("SyntaxError: Unexpected token '{}'", input[..=index].split('\n').last().unwrap().split_whitespace().last().unwrap()));
         }
     }
 

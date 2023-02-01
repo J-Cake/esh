@@ -2,5 +2,6 @@ mod parser;
 mod tokeniser;
 mod matchers;
 
-pub use parser::parse;
-pub use tokeniser::tokenise;
+pub use parser::*;
+pub use tokeniser::*;
+pub use matchers::*;
