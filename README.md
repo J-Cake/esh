@@ -10,7 +10,7 @@ focuses heavily on data processing and manipulation. _Huh??_ I hear you ask? _Wh
 $ ls /some/file
 file1 file2 file3 file 4
 ```
-> Note the space between `file 4`. **As this may be one file**, and not two files a traditional POSIX shell cannot distinguish this, and treats them as separate entities, when they may not be.
+> Note the space between `file 4`. **As this may be one file**, and not two files. A traditional POSIX shell cannot distinguish this, and treats them as separate entities, when they may not be.
 
 ESH aims to ensure that issues like this cannot arise by emitting data in an unambiguous form. This is done by enforcing certain paradigms;
 
@@ -18,7 +18,7 @@ Programs emit data in a very well-defined format which provides the facilities t
 
 ## Why ESH?
 
-Across the board, Erika focuses heavily on correctness, simplicity, performance and customisability. ESH extends this
+Across the board, Erika inherits many of Rust's core principles, such as correctness and performance, but extends this with a heavy focus on customisability. ESH extends this
 principle by providing an equally extensible shell.
 
 # Syntax
