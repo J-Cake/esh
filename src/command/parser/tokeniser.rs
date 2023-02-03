@@ -6,6 +6,7 @@ use std::ops::{Index, Sub};
 use lazy_static;
 
 use crate::command::parser::matchers::Matcher;
+use crate::command::parser::syntax_err::SyntaxError;
 
 #[derive(Copy, Clone, Debug)]
 pub enum PipeType {
@@ -67,6 +68,7 @@ pub enum TokenType {
     Semicolon,
     Comma,
     Dot,
+    Lambda,
     Whitespace(String),
     Comment(String),
 }
@@ -75,8 +77,8 @@ pub enum TokenType {
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
-    pub line: usize,
-    pub column: usize,
+    pub line: i64,
+    pub column: i64,
     pub index: usize,
 }
 
@@ -95,13 +97,14 @@ impl Display for Token {
             TokenType::Semicolon => "Semicolon",
             TokenType::Comma => "Comma",
             TokenType::Dot => "Dot",
+            TokenType::Lambda => "Lambda",
             TokenType::Whitespace(_) => "Whitespace",
             TokenType::Comment(_) => "Comment",
         }, self.lexeme)
     }
 }
 
-pub fn tokenise(input: &str) -> Result<Vec<Token>, String> {
+pub fn tokenise(input: &str) -> Result<Vec<Token>, SyntaxError> {
     let mut tokens = Vec::new();
 
     let matcher = Matcher::new();
@@ -116,15 +119,19 @@ pub fn tokenise(input: &str) -> Result<Vec<Token>, String> {
                 _ => tokens.push(Token {
                     token_type: r#type,
                     lexeme: lexeme.to_owned(),
-                    column: input[..=index].split('\n').last().unwrap().len(),
-                    line: input[..=index].split('\n').count(),
+                    column: input[..=index].split('\n').last().unwrap().len() as i64,
+                    line: input[..=index].split('\n').count() as i64,
                     index,
                 })
             };
 
             index += lexeme.len();
         } else {
-            return Err(format!("SyntaxError: Unexpected token '{}'", input[..=index].split('\n').last().unwrap().split_whitespace().last().unwrap()));
+            return Err(SyntaxError::UnexpectedToken(
+                input[..=index].split('\n').last().unwrap().split_whitespace().last().unwrap().to_owned(),
+                input[..=index].split('\n').last().unwrap().len() as i64,
+                input[..=index].split('\n').count() as i64,
+            ))
         }
     }
 

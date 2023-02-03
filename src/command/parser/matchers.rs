@@ -14,6 +14,7 @@ pub struct Matcher {
     semicolon: Regex,
     comma: Regex,
     dot: Regex,
+    lambda: Regex,
     whitespace: Regex,
     comment: Regex,
 }
@@ -33,6 +34,7 @@ impl Matcher {
             semicolon: Regex::new(r"^;").unwrap(),
             comma: Regex::new(r"^,").unwrap(),
             dot: Regex::new(r"^\.").unwrap(),
+            lambda: Regex::new(r"^->").unwrap(),
             whitespace: Regex::new(r"^\s+").unwrap(),
             comment: Regex::new(r"^(//[^\n]*|/\*.*\*/)").unwrap(),
         }
@@ -138,6 +140,10 @@ impl Matcher {
             self.dot.find(str.as_ref())
                 .map(|m| String::from_utf8_lossy(m.as_bytes()).to_string())
                 .map(|m| (m.clone(), TokenType::Dot)),
+
+            self.lambda.find(str.as_ref())
+                .map(|m| String::from_utf8_lossy(m.as_bytes()).to_string())
+                .map(|m| (m.clone(), TokenType::Lambda)),
 
             self.whitespace.find(str.as_ref())
                 .map(|m| String::from_utf8_lossy(m.as_bytes()).to_string())
