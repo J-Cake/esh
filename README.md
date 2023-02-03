@@ -4,8 +4,17 @@
 
 ESH is fundamentally a shell, but it is also a scripting language, however it is very much unlike traditional shells, in
 that it
-focuses heavily on data processing and manipulation. Programs emit data in a very well-defined format, analogous to
-JSON. ESH then provides tools to manipulate this data in a very powerful way, quite similar to how JQ works.
+focuses heavily on data processing and manipulation. _Huh??_ I hear you ask? _What's new about that??_. The answer to that is, my dear friend, traditional shells focus on understanding and using **text** as-is without much definition. For instance, if you want to iterate over a list of files, emitted by the `ls` program, you might get the following output:
+
+```bash
+$ ls /some/file
+file1 file2 file3 file 4
+```
+> Note the space between `file 4`. **As this may be one file**, and not two files a traditional POSIX shell cannot distinguish this, and treats them as separate entities, when they may not be.
+
+ESH aims to ensure that issues like this cannot arise by emitting data in an unambiguous form. This is done by enforcing certain paradigms;
+
+Programs emit data in a very well-defined format which provides the facilities to express and represent data clearly. ESH then provides facilities to manipulate it, such as filters, mapping functions and various reconstruction and rearrangement tools. A good example of how this works is by considering how JSON and JQ work together. 
 
 ## Why ESH?
 
