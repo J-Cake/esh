@@ -6,6 +6,7 @@ pub use crate::command::parser::tokeniser::tokenise;
 pub enum OpOrExpr {
     Operator(OperatorType),
     Expr(Box<ASTNode>),
+    Literal(LiteralToken),
 }
 
 #[derive(Debug)]
@@ -23,14 +24,18 @@ pub enum LiteralToken {
 }
 
 #[derive(Debug)]
+pub enum DictKey {
+    Key(Box<ASTNode>, Box<ASTNode>),
+    NoKey(Box<ASTNode>),
+}
+
+#[derive(Debug)]
 pub enum ASTNode {
-    Call(String, Vec<KeyOrNoKey>),
-    Pipe(PipeType, Box<ASTNode>),
-    Lambda(Vec<String>, Box<ASTNode>),
-    Expression(Vec<OpOrExpr>),
-    Dict(Vec<KeyOrNoKey>),
-    Index(Vec<ASTNode>),
-    Literal(LiteralToken),
+    Call(Box<ASTNode>, Vec<KeyOrNoKey>), //
+    Lambda(Vec<String>, Box<ASTNode>), //
+    Expression(Vec<OpOrExpr>), //
+    Dict(Vec<DictKey>), //
+    Index(Vec<Box<ASTNode>>),
     // TODO: Define control-flow
     Nothing,
 }
@@ -114,17 +119,33 @@ pub fn top_level_split<F>(tokens: &[Token], predicate: F, keep_delimiter: bool) 
 }
 
 fn parse_call(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
-    if tokens.len() < 3 {
+    if tokens.len() < 3 || !matches!(tokens.last().unwrap().token_type, TokenType::CloseBracket(BracketType::Parenthesis)) {
         return Err(SyntaxError::UnexpectedEOF());
         // return Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column));
     }
 
-    let name = match &tokens[0].token_type {
-        TokenType::Symbol(s) => s,
-        _ => return Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column))
-    };
+    // find last top-level parenthesis
+    let mut bracket_count = 0isize;
+    let mut index = 0usize;
+    for (a, i) in tokens.iter().enumerate() {
+        if matches!(i.token_type, TokenType::OpenBracket(BracketType::Parenthesis)) {
+            if bracket_count == 0 {
+                index = a;
+            }
+            bracket_count += 1;
+        } else if matches!(i.token_type, TokenType::CloseBracket(BracketType::Parenthesis)) {
+            bracket_count -= 1;
+        }
+    }
+    let (function, enclosed) = tokens.split_at(index);
 
-    let enclosed_tokens = top_level_split(get_enclosed_tokens(&tokens[1..])?, |t| matches!(t.token_type, TokenType::Comma), false)?;
+    if let Some(last) = function.last() {
+        if matches!(last.token_type, TokenType::Dot) {
+            return Err(SyntaxError::InvalidSyntax(last.line, last.column));
+        }
+    }
+
+    let enclosed_tokens = top_level_split(get_enclosed_tokens(enclosed)?, |t| matches!(t.token_type, TokenType::Comma), false)?;
 
     let args: Vec<Result<KeyOrNoKey, SyntaxError>> = enclosed_tokens.iter()
         .map(|i| if i.len() > 1 && matches!(i[1].token_type, TokenType::Colon) {
@@ -145,12 +166,21 @@ fn parse_call(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
 
     let args: Vec<KeyOrNoKey> = args.into_iter().map(|i| i.unwrap()).collect();
 
-    Ok(ASTNode::Call(name.to_string(), args))
+    Ok(ASTNode::Call(parse(function)?, args))
 }
 
 fn parse_expr(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
     // If no operators, then it's a single value, so continue
     if !tokens.iter().any(|i| matches!(i.token_type, TokenType::Operator(_))) {
+        if tokens.len() == 1 {
+            return match &tokens[0].token_type {
+                TokenType::Symbol(symbol) => Ok(ASTNode::Expression(vec![OpOrExpr::Literal(LiteralToken::Symbol(symbol.clone()))])),
+                TokenType::String(string) => Ok(ASTNode::Expression(vec![OpOrExpr::Literal(LiteralToken::String(string.clone()))])),
+                TokenType::Number(number) => Ok(ASTNode::Expression(vec![OpOrExpr::Literal(LiteralToken::Number(*number))])),
+                TokenType::Boolean(boolean) => Ok(ASTNode::Expression(vec![OpOrExpr::Literal(LiteralToken::Boolean(*boolean))])),
+                _ => Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column))
+            }
+        }
         return Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column));
     }
 
@@ -179,8 +209,91 @@ fn parse_expr(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
         .collect::<Vec<OpOrExpr>>()))
 }
 
+fn parse_dict(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
+    if let Some(token) = tokens.get(0) {
+        if !matches!(token.token_type, TokenType::OpenBracket(BracketType::Brace)) {
+            return Err(SyntaxError::InvalidSyntax(token.line, token.column));
+        }
+    }
+
+    let enclosed_tokens = top_level_split(get_enclosed_tokens(tokens)?, |t| matches!(t.token_type, TokenType::Comma), false)?;
+
+    let dict = enclosed_tokens.into_iter().map(|i| -> Result<DictKey, SyntaxError> {
+        if let Some(pos) = i.iter().position(|i| matches!(i.token_type, TokenType::Colon)) {
+            let (key, value) = i.split_at(pos);
+
+            Ok(DictKey::Key(parse(key)?, parse(&value[1..])?))
+        } else {
+            Ok(DictKey::NoKey(parse(i)?))
+        }
+    }).collect::<Vec<_>>();
+
+    if let Some(Err(e)) = dict.iter().find(|i| i.is_err()) {
+        return Err(e.clone());
+    }
+
+    Ok(ASTNode::Dict(dict.into_iter().map(|i| i.unwrap()).collect()))
+}
+
+fn parse_index(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
+    if tokens.len() != 1 {
+        return Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column));
+    }
+
+    let indices = top_level_split(tokens, |t| matches!(t.token_type, TokenType::Dot), false)?;
+
+    let mut indices = indices.into_iter().map(parse);
+
+    if indices.any(|i| i.is_err()) {
+        return Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column));
+    }
+
+    Ok(ASTNode::Index(indices.map(|i| i.unwrap()).collect()))
+}
+
+fn parse_lambda(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
+    if let Some(lambda) = tokens.iter().position(|i| matches!(i.token_type, TokenType::Lambda)) {
+        let (args, body) = tokens.split_at(lambda);
+
+        let args = top_level_split(args, |t| matches!(t.token_type, TokenType::Semicolon), false)?;
+
+        if args.iter().any(|i| i.len() != 1 || !matches!(i[0].token_type, TokenType::Symbol(_))) {
+            return Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column));
+        }
+
+        let args: Vec<String> = args.iter().map(|i| i[0].lexeme.to_owned()).collect();
+
+        let body = parse(&body[1..])?;
+
+        Ok(ASTNode::Lambda(args, body))
+    } else {
+        Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column))
+    }
+}
+
 pub fn parse(tokens: &[Token]) -> Result<Box<ASTNode>, SyntaxError> {
-    // Call: symbol, open_paren, _enclosed_ close_paren
+    if let Some(token) = tokens.get(0) {
+        if matches!(token.token_type, TokenType::OpenBracket(BracketType::Parenthesis)) {
+            if let Ok(node) = get_enclosed_tokens(tokens) {
+                return parse(node);
+            }
+        }
+    }
+
+    if let Ok(lambda) = parse_lambda(tokens) {
+        return Ok(Box::new(lambda));
+    } else {
+        println!("Expression is not a lambda");
+    }
+
+    if let Ok(dict) = parse_dict(tokens) {
+        return Ok(Box::new(dict));
+    }
+
+    if let Ok(index) = parse_index(tokens) {
+        return Ok(Box::new(index));
+    }
+
     if let Ok(call) = parse_call(tokens) {
         return Ok(Box::new(call));
     }
@@ -189,17 +302,7 @@ pub fn parse(tokens: &[Token]) -> Result<Box<ASTNode>, SyntaxError> {
         return Ok(Box::new(expr));
     }
 
-    if tokens.len() == 1 {
-        match &tokens[0].token_type {
-            TokenType::Symbol(symbol) => Ok(Box::new(ASTNode::Literal(LiteralToken::Symbol(symbol.clone())))),
-            TokenType::String(string) => Ok(Box::new(ASTNode::Literal(LiteralToken::String(string.clone())))),
-            TokenType::Number(number) => Ok(Box::new(ASTNode::Literal(LiteralToken::Number(*number)))),
-            TokenType::Boolean(boolean) => Ok(Box::new(ASTNode::Literal(LiteralToken::Boolean(*boolean)))),
-            _ => Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column))
-        }
-    } else {
-        Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column))
-    }
+    Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column))
 }
 
 #[cfg(test)]

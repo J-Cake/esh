@@ -127,6 +127,8 @@ pub fn tokenise(input: &str) -> Result<Vec<Token>, SyntaxError> {
 
             index += lexeme.len();
         } else {
+            dbg!(tokens, index);
+
             return Err(SyntaxError::UnexpectedToken(
                 input[..=index].split('\n').last().unwrap().split_whitespace().last().unwrap().to_owned(),
                 input[..=index].split('\n').last().unwrap().len() as i64,

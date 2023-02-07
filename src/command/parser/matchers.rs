@@ -22,7 +22,8 @@ pub struct Matcher {
 impl Matcher {
     pub(crate) fn new() -> Self {
         Self {
-            symbol: Regex::new(r"(^[~.#]?(?:/\S+)+)|^([~.#]?/)|^([a-zA-Z0-9][a-zA-Z0-9@#$^]+)").unwrap(),
+            // symbol: Regex::new(r"(^[~.#]?(?:/\S+)+)|^([~.#]?/)|^([a-zA-Z0-9][a-zA-Z0-9@#$^]+)").unwrap(),
+            symbol: Regex::new(r"^[a-zA-Z0-9@#$^_]+").unwrap(),
             string: Regex::new(r#"^[a-z]?"([^"\\]|\\.)*"|^[a-z]?'([^'\\]|\\.)*'"#).unwrap(),
             number: Regex::new(r"(^-?[0-9]+(?:\.[0-9]+)?(?:[xX][+-]?[0-9]+)?)|(^-?0x[0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?(?:[xX][+-]?[0-9]+)?)|(^-?0b[01]+(?:\.[01]+)?(?:[xX][+-]?[0-9]+)?)").unwrap(),
             boolean: Regex::new(r"^true|false").unwrap(),
