@@ -1,21 +1,21 @@
 use crate::command::parser::syntax_err::SyntaxError;
-use crate::command::parser::tokeniser::{BracketType, OperatorType, PipeType, Token, TokenType};
+use crate::command::parser::tokeniser::{BracketType, OperatorType, Token, TokenType};
 pub use crate::command::parser::tokeniser::tokenise;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OpOrExpr {
     Operator(OperatorType),
     Expr(Box<ASTNode>),
     Literal(LiteralToken),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum KeyOrNoKey {
     Key(String, Box<ASTNode>),
     NoKey(Box<ASTNode>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LiteralToken {
     Symbol(String),
     String(String),
@@ -23,19 +23,20 @@ pub enum LiteralToken {
     Boolean(bool),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DictKey {
     Key(Box<ASTNode>, Box<ASTNode>),
     NoKey(Box<ASTNode>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTNode {
     Call(Box<ASTNode>, Vec<KeyOrNoKey>), //
     Lambda(Vec<String>, Box<ASTNode>), //
     Expression(Vec<OpOrExpr>), //
     Dict(Vec<DictKey>), //
-    Index(Vec<Box<ASTNode>>),
+    Index(Vec<Box<ASTNode>>), //
+    Import(Vec<String>, Box<ASTNode>), //
     // TODO: Define control-flow
     Nothing,
 }

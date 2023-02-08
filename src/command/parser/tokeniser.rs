@@ -1,9 +1,4 @@
-use std::cmp::{Ord, Ordering};
-use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Index, Sub};
-
-use lazy_static;
 
 use crate::command::parser::matchers::Matcher;
 use crate::command::parser::syntax_err::SyntaxError;
@@ -34,6 +29,23 @@ pub enum OperatorType {
     Or,
     Not,
     Assign,
+}
+
+impl OperatorType {
+    pub fn precedence(&self) -> i8 {
+        match self {
+            OperatorType::Pipe(_) => 0,
+            OperatorType::Or => 1,
+            OperatorType::And => 2,
+            OperatorType::Equal | OperatorType::NotEqual => 3,
+            OperatorType::GreaterThan | OperatorType::LessThan | OperatorType::GreaterThanOrEqual | OperatorType::LessThanOrEqual => 4,
+            OperatorType::Add | OperatorType::Subtract => 5,
+            OperatorType::Multiply | OperatorType::Divide | OperatorType::Modulo => 6,
+            OperatorType::Exponent => 7,
+            OperatorType::Not => 8,
+            OperatorType::Assign => 9,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
