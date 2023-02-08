@@ -210,6 +210,7 @@ fn parse_expr(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
 }
 
 fn parse_dict(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
+    // Dict: { expr: expr... }
     if let Some(token) = tokens.get(0) {
         if !matches!(token.token_type, TokenType::OpenBracket(BracketType::Brace)) {
             return Err(SyntaxError::InvalidSyntax(token.line, token.column));
@@ -236,7 +237,8 @@ fn parse_dict(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
 }
 
 fn parse_index(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
-    if tokens.len() != 1 {
+    // Index: expr1.expr2.expr3
+    if tokens.len() <= 1 || !tokens.iter().any(|i| matches!(i.token_type, TokenType::Dot)) {
         return Err(SyntaxError::InvalidSyntax(tokens[0].line, tokens[0].column));
     }
 
@@ -252,6 +254,8 @@ fn parse_index(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
 }
 
 fn parse_lambda(tokens: &[Token]) -> Result<ASTNode, SyntaxError> {
+    // Lambdas: arg1; arg2; ...; argn -> body
+
     if let Some(lambda) = tokens.iter().position(|i| matches!(i.token_type, TokenType::Lambda)) {
         let (args, body) = tokens.split_at(lambda);
 
@@ -282,8 +286,6 @@ pub fn parse(tokens: &[Token]) -> Result<Box<ASTNode>, SyntaxError> {
 
     if let Ok(lambda) = parse_lambda(tokens) {
         return Ok(Box::new(lambda));
-    } else {
-        println!("Expression is not a lambda");
     }
 
     if let Ok(dict) = parse_dict(tokens) {
